@@ -2,7 +2,8 @@ export function createNoteManager({
   registry,
   noteTypes,
   scheduleTopicNoteIndicatorRefresh,
-  requestAnimationFrame: requestAnimationFrameFn
+  requestAnimationFrame: requestAnimationFrameFn,
+  pluginManager = null
 }) {
   if (!registry) {
     throw new Error('Note manager requires a registry instance');
@@ -18,22 +19,64 @@ export function createNoteManager({
 
   const raf = typeof requestAnimationFrameFn === 'function'
     ? requestAnimationFrameFn
-    : (callback) => setTimeout(callback, 16);
+    : callback => setTimeout(callback, 16);
+
+  const emitPluginEvent = (hook, payload) => {
+    if (!pluginManager || typeof pluginManager.emit !== 'function') {
+      return;
+    }
+    pluginManager.emit(hook, { ...payload, manager: pluginManager });
+  };
 
   let notesViewController = null;
   let pendingNotesViewUpdate = false;
 
   function ensureNoteData(noteId, overrides = {}) {
-    return registry.ensure(noteId, overrides);
+    const normalizedId = typeof noteId === 'string' ? noteId.trim() : '';
+    const existed = normalizedId ? registry.has(normalizedId) : false;
+    const note = registry.ensure(noteId, overrides);
+
+    if (existed) {
+      emitPluginEvent('notes:updated', {
+        noteId: note.id,
+        note,
+        updates: overrides,
+        source: 'ensure'
+      });
+    } else {
+      emitPluginEvent('notes:created', {
+        noteId: note.id,
+        note,
+        overrides
+      });
+    }
+
+    return note;
   }
 
   function updateNoteData(noteId, updates = {}, { silent = false } = {}) {
-    return registry.update(noteId, updates, { silent });
+    const note = registry.update(noteId, updates, { silent });
+    if (note) {
+      emitPluginEvent('notes:updated', {
+        noteId,
+        note,
+        updates,
+        options: { silent }
+      });
+    }
+    return note;
   }
 
   function removeNoteData(noteId) {
     if (!noteId) return;
-    registry.remove(noteId);
+    const existing = registry.get(noteId);
+    const removed = registry.remove(noteId);
+    if (removed) {
+      emitPluginEvent('notes:removed', {
+        noteId,
+        note: existing || null
+      });
+    }
   }
 
   function isFloatingFamilyNote(note) {

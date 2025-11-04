@@ -362,6 +362,36 @@ export const storage = getStorage(app);
 - Garantizar accesibilidad (teclado, ARIA en menús, contraste en temas).
 - Documentar eventos globales (`editor:*`, `note:*`, `cloudSync:*`, `auth:*`) para facilitar extensiones.
 
+## 15. Sistema de plugins y extensiones
+- El núcleo del editor expone un `PluginManager` basado en eventos (`editor:beforeInit`, `editor:afterInit`, `notes:*`) que permite activar lógica adicional sin modificar archivos internos.
+- Los plugins se registran mediante `registerPlugin({ name, hooks, setup, initialize })` y pueden añadirse antes de cargar el editor o a través de `window.coraNotes.pluginManager`.
+- Se exponen utilidades clave en el contexto de inicialización (gestor de notas, registro de notas, referencia a `document`) para que los plugins reaccionen a estados del editor.
+- La seguridad se refuerza encapsulando cada callback en un `safeInvoke` que reporta errores sin comprometer el flujo principal.
+
+### 15.1 Ejemplo de plugin
+```js
+import { registerPlugin } from './scripts/modules/plugins/pluginManager.js';
+
+registerPlugin({
+  name: 'note-logger',
+  hooks: {
+    'notes:created': ({ note }) => console.info('Nueva nota', note.id),
+    'editor:afterInit': ({ appName }) => console.info(`${appName} listo para usar`)
+  }
+});
+```
+
+## 16. Estrategia de pruebas automatizadas
+- **Unitarias (Jest)**: ubicadas en `tests/unit`, cubren utilidades de notas y el `PluginManager`.
+- **Integración (Jest)**: en `tests/integration`, validan la interacción `NoteRegistry` ↔ `NoteManager` y la emisión de eventos de plugins.
+- **End-to-end (Cypress)**: escenarios en `cypress/e2e` que abren la aplicación sobre un servidor estático (`npm run serve`) y verifican componentes críticos (topbar, acciones primarias).
+- Scripts disponibles: `npm run test:unit`, `npm run test:integration`, `npm run test:e2e` y `npm test` para la ejecución completa.
+
+## 17. Calidad de código y hooks de git
+- ESLint (`npm run lint`) aplica la guía `eslint:recommended` + `plugin:import/recommended` con reglas para importaciones consistentes y evitar `console` accidentales.
+- Prettier (`npm run format`) garantiza estilo uniforme (`printWidth: 100`, comillas simples, comas finales). El chequeo se integra con `npm run format:check`.
+- Husky + lint-staged ejecutan `eslint` y `prettier` sobre los archivos modificados antes de cada commit, asegurando que la convención se mantenga.
+
 ---
 
 Esta especificación sirve como guía integral para que otra IA o equipo humano construya Cora Notes desde cero, respetando la filosofía original y ampliándola con una arquitectura modular, sincronización en la nube, autenticación segura, integración de IA y soporte robusto de importación/exportación JSON.

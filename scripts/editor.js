@@ -24,6 +24,10 @@ import {
   getNoteTitlePlainText
 } from './modules/notes/noteUtils.js';
 import {
+  createPluginManager,
+  registerPlugin as registerGlobalPlugin
+} from './modules/plugins/pluginManager.js';
+import {
   APP_NAME,
   IMAGE_MIN_WIDTH,
   IMAGE_MAX_WIDTH,
@@ -70,7 +74,31 @@ import {
 } from './modules/editor/templateConfig.js';
 import { createNoteManager } from './modules/editor/noteManager.js';
 
-export async function initializeEditor() {
+export async function initializeEditor({ plugins = [] } = {}) {
+      const pluginManager = createPluginManager({
+        availableHooks: [
+          'editor:beforeInit',
+          'editor:afterInit',
+          'notes:created',
+          'notes:updated',
+          'notes:removed'
+        ],
+        plugins
+      });
+
+      const pluginContext = {
+        appName: APP_NAME,
+        document,
+        window: typeof window !== 'undefined' ? window : undefined,
+        pluginManager
+      };
+
+      if (typeof window !== 'undefined') {
+        window.coraNotes = window.coraNotes || {};
+        window.coraNotes.pluginManager = pluginManager;
+        window.coraNotes.registerPlugin = registerGlobalPlugin;
+      }
+
       let isEditMode = false;
       let isPanelEditMode = false;
       let isReadingMode = false;
@@ -321,8 +349,18 @@ export async function initializeEditor() {
         scheduleTopicNoteIndicatorRefresh,
         requestAnimationFrame: typeof requestAnimationFrame === 'function'
           ? requestAnimationFrame
-          : (callback) => setTimeout(callback, 16)
+          : (callback) => setTimeout(callback, 16),
+        pluginManager
       });
+
+      pluginContext.noteRegistry = notesRegistry;
+      pluginContext.noteManager = {
+        ensureNoteData,
+        updateNoteData,
+        removeNoteData
+      };
+
+      pluginManager.initialize(pluginContext);
 
       function getPageTheme(page) {
         if (!page) return DEFAULT_THEME;

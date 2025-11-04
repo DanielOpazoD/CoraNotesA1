@@ -70,7 +70,9 @@ export const AVAILABLE_THEMES = [
   'theme-teal',
   'theme-rose',
   'theme-sand',
-  'theme-slate'
+  'theme-slate',
+  'theme-dark',
+  'theme-custom'
 ];
 
 export const DEFAULT_THEME = 'theme-blue';
@@ -89,3 +91,11 @@ export const TOPBAR_THEME_STORAGE_KEY = 'emi2025-topbar-theme';
 export const CACHE_STORAGE_KEY = 'emi2025-editor-cache-v1';
 export const EXTENDED_CACHE_DB_NAME = 'emi2025-editor-cache';
 export const EXTENDED_CACHE_STORE_NAME = 'snapshots';
+
+export const CUSTOM_THEME_STORAGE_KEY = 'emi2025-custom-theme';
+export const DEFAULT_CUSTOM_THEME = {
+  primary: '#6366f1',
+  background: '#0f172a',
+  surface: '#111827',
+  text: '#e2e8f0'
+};

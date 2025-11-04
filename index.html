@@ -169,7 +169,27 @@
           <option value="theme-rose">Rosa</option>
           <option value="theme-sand">Arena</option>
           <option value="theme-slate">Pizarra</option>
+          <option value="theme-dark">Oscuro</option>
+          <option value="theme-custom">Personalizado</option>
         </select>
+        <div class="custom-theme-controls" id="customThemeControls" hidden>
+          <label for="customThemePrimary">
+            <span>Primario</span>
+            <input type="color" id="customThemePrimary" value="#6366f1" title="Color primario personalizado" />
+          </label>
+          <label for="customThemeBackground">
+            <span>Fondo</span>
+            <input type="color" id="customThemeBackground" value="#0f172a" title="Color de fondo personalizado" />
+          </label>
+          <label for="customThemeSurface">
+            <span>Superficie</span>
+            <input type="color" id="customThemeSurface" value="#111827" title="Color de superficie" />
+          </label>
+          <label for="customThemeText">
+            <span>Texto</span>
+            <input type="color" id="customThemeText" value="#e2e8f0" title="Color de texto" />
+          </label>
+        </div>
         <button id="exportTopicBtn" title="Exportar">💾</button>
       </div>
     </div>

@@ -53,7 +53,9 @@ import {
   DEFAULT_THEME,
   AVAILABLE_TOPBAR_THEMES,
   TOPBAR_THEME_STORAGE_KEY,
-  CACHE_STORAGE_KEY
+  CACHE_STORAGE_KEY,
+  CUSTOM_THEME_STORAGE_KEY,
+  DEFAULT_CUSTOM_THEME
 } from './modules/editor/editorConfig.js';
 import { createExtendedCacheController } from './modules/editor/extendedCache.js';
 import { createStylesheetLoader } from './modules/editor/stylesheetLoader.js';
@@ -73,6 +75,8 @@ import {
   createTemplateNoteStylePresetMap
 } from './modules/editor/templateConfig.js';
 import { createNoteManager } from './modules/editor/noteManager.js';
+import { createCacheStorageController } from './modules/editor/cacheStorage.js';
+import { createVirtualList } from './modules/editor/virtualList.js';
 
 export async function initializeEditor({ plugins = [] } = {}) {
       const pluginManager = createPluginManager({
@@ -103,6 +107,7 @@ export async function initializeEditor({ plugins = [] } = {}) {
       let isPanelEditMode = false;
       let isReadingMode = false;
       let pages = [...document.querySelectorAll('.page')];
+      enableLazyLoadingForImages(document);
       let globalTopicCounter = 1;
       let selectedImage = null;
       let selectedTemplateBlock = null;
@@ -188,7 +193,22 @@ export async function initializeEditor({ plugins = [] } = {}) {
         hasOpenExtendedCache
       } = createExtendedCacheController();
 
+      const {
+        isSupported: isCacheStorageAvailable,
+        writeSnapshot: writeCacheSnapshot,
+        readSnapshot: readCacheSnapshot,
+        clearSnapshot: clearCacheSnapshot,
+        precacheAssets: precacheCacheAssets
+      } = createCacheStorageController();
+
       const { getStylesheetTextForExport } = createStylesheetLoader();
+
+      if (typeof window !== 'undefined' && isCacheStorageAvailable()) {
+        const coreAssets = ['styles/main.css', 'scripts/app.js'];
+        precacheCacheAssets(coreAssets).catch(() => {
+          /* Ignorar fallos de precacheo */
+        });
+      }
 
 
       let sections = [];
@@ -325,6 +345,11 @@ export async function initializeEditor({ plugins = [] } = {}) {
       const templateAddSpaceTopBtn = document.getElementById('templateAddSpaceTopBtn');
       const templateAddSpaceBottomBtn = document.getElementById('templateAddSpaceBottomBtn');
       const themeSelect = document.getElementById('themeSelect');
+      const customThemeControls = document.getElementById('customThemeControls');
+      const customThemePrimaryInput = document.getElementById('customThemePrimary');
+      const customThemeBackgroundInput = document.getElementById('customThemeBackground');
+      const customThemeSurfaceInput = document.getElementById('customThemeSurface');
+      const customThemeTextInput = document.getElementById('customThemeText');
 
       const templateBackgroundPaletteColors = TEMPLATE_BACKGROUND_PALETTE_COLORS;
       const templateTextPaletteColors = TEMPLATE_TEXT_PALETTE_COLORS;
@@ -333,6 +358,8 @@ export async function initializeEditor({ plugins = [] } = {}) {
       const noteStylePresets = TEMPLATE_NOTE_STYLE_PRESETS;
       const NOTE_STYLE_CLASSES = TEMPLATE_NOTE_STYLE_CLASSES;
       const noteStylePresetMap = createTemplateNoteStylePresetMap();
+
+      let customThemeSettings = { ...DEFAULT_CUSTOM_THEME };
 
       const notesRegistry = new NoteRegistry();
       const {
@@ -362,6 +389,232 @@ export async function initializeEditor({ plugins = [] } = {}) {
 
       pluginManager.initialize(pluginContext);
 
+      function normalizeHexColor(value, fallback) {
+        if (typeof value !== 'string') {
+          return fallback;
+        }
+        let hex = value.trim();
+        if (!hex) {
+          return fallback;
+        }
+        if (hex.startsWith('#')) {
+          hex = hex.slice(1);
+        }
+        if (hex.length === 3) {
+          hex = hex.split('').map(ch => ch + ch).join('');
+        }
+        if (!/^[0-9a-f]{6}$/i.test(hex)) {
+          return fallback;
+        }
+        return `#${hex.toLowerCase()}`;
+      }
+
+      function hexToRgb(hex) {
+        const normalized = normalizeHexColor(hex, null);
+        if (!normalized) {
+          return null;
+        }
+        const value = normalized.slice(1);
+        return {
+          r: parseInt(value.slice(0, 2), 16),
+          g: parseInt(value.slice(2, 4), 16),
+          b: parseInt(value.slice(4, 6), 16)
+        };
+      }
+
+      function rgbToHsl(r, g, b) {
+        const rNorm = r / 255;
+        const gNorm = g / 255;
+        const bNorm = b / 255;
+        const max = Math.max(rNorm, gNorm, bNorm);
+        const min = Math.min(rNorm, gNorm, bNorm);
+        let h = 0;
+        let s = 0;
+        const l = (max + min) / 2;
+
+        if (max !== min) {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          switch (max) {
+            case rNorm:
+              h = ((gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0));
+              break;
+            case gNorm:
+              h = ((bNorm - rNorm) / d + 2);
+              break;
+            default:
+              h = ((rNorm - gNorm) / d + 4);
+              break;
+          }
+          h /= 6;
+        }
+
+        return { h, s, l };
+      }
+
+      function hslToHex(h, s, l) {
+        function hueToRgb(p, q, t) {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+        }
+
+        let r;
+        let g;
+        let b;
+        if (s === 0) {
+          r = g = b = l;
+        } else {
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          const p = 2 * l - q;
+          r = hueToRgb(p, q, h + 1 / 3);
+          g = hueToRgb(p, q, h);
+          b = hueToRgb(p, q, h - 1 / 3);
+        }
+
+        const toHex = (value) => Math.round(value * 255).toString(16).padStart(2, '0');
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toLowerCase();
+      }
+
+      function adjustColorLightness(hex, delta, fallback) {
+        const normalized = normalizeHexColor(hex, fallback);
+        if (!normalized) {
+          return normalizeHexColor(fallback, '#ffffff');
+        }
+        const rgb = hexToRgb(normalized);
+        if (!rgb) {
+          return normalizeHexColor(fallback, '#ffffff');
+        }
+        const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+        const nextLightness = Math.min(1, Math.max(0, l + delta));
+        return hslToHex(h, Math.min(1, Math.max(0, s)), nextLightness);
+      }
+
+      function applyCustomThemeVariables(settings) {
+        const primary = normalizeHexColor(settings?.primary, DEFAULT_CUSTOM_THEME.primary);
+        const background = normalizeHexColor(settings?.background, DEFAULT_CUSTOM_THEME.background);
+        const surface = normalizeHexColor(settings?.surface, DEFAULT_CUSTOM_THEME.surface);
+        const text = normalizeHexColor(settings?.text, DEFAULT_CUSTOM_THEME.text);
+        const primaryDark = adjustColorLightness(primary, -0.18, DEFAULT_CUSTOM_THEME.primary);
+        const primaryLight = adjustColorLightness(primary, 0.22, DEFAULT_CUSTOM_THEME.primary);
+        const surfaceElevated = adjustColorLightness(surface, 0.08, DEFAULT_CUSTOM_THEME.surface);
+        const surfaceBorder = adjustColorLightness(surface, 0.2, DEFAULT_CUSTOM_THEME.surface);
+        const muted = adjustColorLightness(text, -0.35, DEFAULT_CUSTOM_THEME.text);
+        const rootStyle = document.documentElement.style;
+        rootStyle.setProperty('--custom-theme-primary', primary);
+        rootStyle.setProperty('--custom-theme-primary-dark', primaryDark);
+        rootStyle.setProperty('--custom-theme-primary-light', primaryLight);
+        rootStyle.setProperty('--custom-theme-background', background);
+        rootStyle.setProperty('--custom-theme-surface', surface);
+        rootStyle.setProperty('--custom-theme-surface-elevated', surfaceElevated);
+        rootStyle.setProperty('--custom-theme-border', surfaceBorder);
+        rootStyle.setProperty('--custom-theme-text', text);
+        rootStyle.setProperty('--custom-theme-muted', muted);
+      }
+
+      function updateCustomThemeInputs(settings) {
+        if (!customThemeControls) {
+          return;
+        }
+        const normalized = {
+          primary: normalizeHexColor(settings?.primary, DEFAULT_CUSTOM_THEME.primary),
+          background: normalizeHexColor(settings?.background, DEFAULT_CUSTOM_THEME.background),
+          surface: normalizeHexColor(settings?.surface, DEFAULT_CUSTOM_THEME.surface),
+          text: normalizeHexColor(settings?.text, DEFAULT_CUSTOM_THEME.text)
+        };
+        if (customThemePrimaryInput) customThemePrimaryInput.value = normalized.primary;
+        if (customThemeBackgroundInput) customThemeBackgroundInput.value = normalized.background;
+        if (customThemeSurfaceInput) customThemeSurfaceInput.value = normalized.surface;
+        if (customThemeTextInput) customThemeTextInput.value = normalized.text;
+      }
+
+      function loadStoredCustomTheme() {
+        if (typeof window === 'undefined' || !window.localStorage) {
+          return null;
+        }
+        try {
+          const raw = window.localStorage.getItem(CUSTOM_THEME_STORAGE_KEY);
+          if (!raw) {
+            return null;
+          }
+          const parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== 'object') {
+            return null;
+          }
+          return {
+            primary: normalizeHexColor(parsed.primary, DEFAULT_CUSTOM_THEME.primary),
+            background: normalizeHexColor(parsed.background, DEFAULT_CUSTOM_THEME.background),
+            surface: normalizeHexColor(parsed.surface, DEFAULT_CUSTOM_THEME.surface),
+            text: normalizeHexColor(parsed.text, DEFAULT_CUSTOM_THEME.text)
+          };
+        } catch (error) {
+          console.warn('No se pudo cargar el tema personalizado almacenado:', error);
+          return null;
+        }
+      }
+
+      function persistCustomThemeSettings(settings) {
+        if (typeof window === 'undefined' || !window.localStorage) {
+          return;
+        }
+        try {
+          window.localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify(settings));
+        } catch (error) {
+          console.warn('No se pudo guardar el tema personalizado:', error);
+        }
+      }
+
+      function setCustomThemeControlsVisibility(themeClass) {
+        if (!customThemeControls) {
+          return;
+        }
+        const show = themeClass === 'theme-custom';
+        customThemeControls.hidden = !show;
+        customThemeControls.setAttribute('aria-hidden', show ? 'false' : 'true');
+      }
+
+      function handleCustomThemeInputChange() {
+        const next = {
+          primary: customThemePrimaryInput?.value || customThemeSettings.primary,
+          background: customThemeBackgroundInput?.value || customThemeSettings.background,
+          surface: customThemeSurfaceInput?.value || customThemeSettings.surface,
+          text: customThemeTextInput?.value || customThemeSettings.text
+        };
+        customThemeSettings = {
+          primary: normalizeHexColor(next.primary, DEFAULT_CUSTOM_THEME.primary),
+          background: normalizeHexColor(next.background, DEFAULT_CUSTOM_THEME.background),
+          surface: normalizeHexColor(next.surface, DEFAULT_CUSTOM_THEME.surface),
+          text: normalizeHexColor(next.text, DEFAULT_CUSTOM_THEME.text)
+        };
+        applyCustomThemeVariables(customThemeSettings);
+        updateCustomThemeInputs(customThemeSettings);
+        persistCustomThemeSettings(customThemeSettings);
+        if (themeSelect?.value === 'theme-custom' && !document.body.classList.contains('theme-custom')) {
+          syncBodyTheme('theme-custom');
+        }
+      }
+
+      const storedCustomTheme = loadStoredCustomTheme();
+      if (storedCustomTheme) {
+        customThemeSettings = storedCustomTheme;
+      }
+      applyCustomThemeVariables(customThemeSettings);
+      updateCustomThemeInputs(customThemeSettings);
+      const initialThemeClass = (() => {
+        const bodyTheme = AVAILABLE_THEMES.find(cls => document.body.classList.contains(cls));
+        if (bodyTheme) {
+          return bodyTheme;
+        }
+        if (themeSelect && AVAILABLE_THEMES.includes(themeSelect.value)) {
+          return themeSelect.value;
+        }
+        return DEFAULT_THEME;
+      })();
+      setCustomThemeControlsVisibility(initialThemeClass);
+
       function getPageTheme(page) {
         if (!page) return DEFAULT_THEME;
         const classTheme = Array.from(page.classList || []).find(cls => AVAILABLE_THEMES.includes(cls));
@@ -383,6 +636,10 @@ export async function initializeEditor({ plugins = [] } = {}) {
         const validTheme = AVAILABLE_THEMES.includes(themeClass) ? themeClass : DEFAULT_THEME;
         AVAILABLE_THEMES.forEach(cls => document.body.classList.remove(cls));
         document.body.classList.add(validTheme);
+        if (validTheme === 'theme-custom') {
+          applyCustomThemeVariables(customThemeSettings);
+        }
+        setCustomThemeControlsVisibility(validTheme);
         if (isReadingMode) {
           document.body.classList.add('reading-mode');
         }
@@ -394,6 +651,20 @@ export async function initializeEditor({ plugins = [] } = {}) {
         if (themeSelect.value !== validTheme) {
           themeSelect.value = validTheme;
         }
+      }
+
+      function enableLazyLoadingForImages(root = document) {
+        if (!root) {
+          return;
+        }
+        root.querySelectorAll('img').forEach((img) => {
+          if (!img.hasAttribute('loading')) {
+            img.setAttribute('loading', 'lazy');
+          }
+          if (!img.hasAttribute('decoding')) {
+            img.setAttribute('decoding', 'async');
+          }
+        });
       }
 
       function updateSectionIndicator(page) {
@@ -4115,6 +4386,7 @@ export async function initializeEditor({ plugins = [] } = {}) {
         purgeUnwantedNotes(root);
         normalizePearls(root);
         resetInteractiveBindings(root);
+        enableLazyLoadingForImages(root);
         initializeCollapseCards(root);
       }
 
@@ -5737,6 +6009,7 @@ export async function initializeEditor({ plugins = [] } = {}) {
 
       function markFloatingNoteImagesInitialized(container) {
         if (!container) return;
+        enableLazyLoadingForImages(container);
         container.querySelectorAll('img').forEach(img => {
           if (!img.dataset.initialSizeLocked) {
             img.dataset.initialSizeLocked = 'true';
@@ -7319,16 +7592,22 @@ export async function initializeEditor({ plugins = [] } = {}) {
 
       function applyFloatingNoteTopicVisibility(note, options = {}) {
         if (!note) return;
-        const { relaxMatching = false } = options;
-        const currentTopic = getCurrentTopicId();
+        const {
+          relaxMatching = false,
+          currentTopicId = null,
+          viewportState = null
+        } = options;
+        const effectiveTopicId = typeof currentTopicId === 'string' && currentTopicId
+          ? currentTopicId
+          : getCurrentTopicId();
         const noteTopicId = resolveNoteTopicId(note);
 
-        const shouldShow = currentTopic && noteTopicId ? noteTopicId === currentTopic : false;
+        const shouldShow = effectiveTopicId && noteTopicId ? noteTopicId === effectiveTopicId : false;
 
         if (shouldShow) {
-          const viewportState = getActiveTopicViewportState();
-          if (viewportState) {
-            syncNoteViewportAnchors(note, viewportState, { force: relaxMatching });
+          const state = viewportState || getActiveTopicViewportState();
+          if (state) {
+            syncNoteViewportAnchors(note, state, { force: relaxMatching });
           }
         }
 
@@ -7345,14 +7624,24 @@ export async function initializeEditor({ plugins = [] } = {}) {
         note.classList.toggle('floating-note-visible', shouldShow);
       }
 
-      function refreshFloatingNotesTopicVisibility({ relaxMatching = false } = {}) {
+      function refreshFloatingNotesTopicVisibility({ relaxMatching = false, viewportState = null } = {}) {
         if (!floatingNotesLayer) return;
         let shouldRelax = !!relaxMatching;
         if (!shouldRelax) {
           shouldRelax = consumeFloatingNotesRelaxedMatching();
         }
-        floatingNotesLayer.querySelectorAll('.floating-note').forEach(note => {
-          applyFloatingNoteTopicVisibility(note, { relaxMatching: shouldRelax });
+        const notes = Array.from(floatingNotesLayer.querySelectorAll('.floating-note'));
+        if (!notes.length) {
+          return;
+        }
+        const currentTopicId = getCurrentTopicId();
+        const state = viewportState || (currentTopicId ? getActiveTopicViewportState() : null);
+        notes.forEach(note => {
+          applyFloatingNoteTopicVisibility(note, {
+            relaxMatching: shouldRelax,
+            currentTopicId,
+            viewportState: state
+          });
         });
       }
 
@@ -9651,6 +9940,8 @@ export async function initializeEditor({ plugins = [] } = {}) {
           this.currentScope = 'all';
           this.viewMode = 'list';
           this.deleteEnabled = false;
+          this.virtualList = null;
+          this.emptyStateElement = null;
           this.filters = {
             category: '',
             priority: '',
@@ -9732,6 +10023,86 @@ export async function initializeEditor({ plugins = [] } = {}) {
           });
         }
 
+        ensureVirtualList() {
+          if (!this.container) {
+            return null;
+          }
+          if (!this.virtualList) {
+            this.virtualList = createVirtualList({
+              container: this.container,
+              estimatedItemHeight: 196,
+              overscan: 6,
+              renderItem: (item) => this.renderVirtualItem(item)
+            });
+          }
+          return this.virtualList;
+        }
+
+        teardownVirtualList() {
+          if (this.virtualList) {
+            this.virtualList.destroy();
+            this.virtualList = null;
+          }
+        }
+
+        showEmptyState() {
+          if (!this.container) return;
+          if (!this.emptyStateElement) {
+            const empty = document.createElement('div');
+            empty.className = 'note-list-empty';
+            empty.textContent = 'No hay notas para mostrar.';
+            this.emptyStateElement = empty;
+          }
+          this.container.innerHTML = '';
+          this.container.appendChild(this.emptyStateElement);
+        }
+
+        hideEmptyState() {
+          if (this.emptyStateElement?.parentElement === this.container) {
+            this.container.removeChild(this.emptyStateElement);
+          }
+        }
+
+        buildVirtualItems(notes) {
+          if (this.currentScope === 'all') {
+            const grouped = this.groupNotesBySection(notes);
+            const items = [];
+            grouped.forEach(group => {
+              items.push({
+                type: 'section-header',
+                sectionId: group.sectionId,
+                title: group.title,
+                count: group.notes.length
+              });
+              group.notes.forEach(note => {
+                items.push({ type: 'note', note });
+              });
+            });
+            return items;
+          }
+          return notes.map(note => ({ type: 'note', note }));
+        }
+
+        renderVirtualItem(item) {
+          if (!item) {
+            return null;
+          }
+          if (item.type === 'section-header') {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'note-section-divider';
+            const title = document.createElement('h4');
+            title.className = 'notes-section-title';
+            const safeTitle = escapeHtml(item.title || 'Sin sección');
+            title.innerHTML = `${safeTitle} <span class="notes-count">(${item.count})</span>`;
+            wrapper.appendChild(title);
+            return wrapper;
+          }
+          if (item.type === 'note') {
+            return this.createNoteItem(item.note);
+          }
+          return null;
+        }
+
         isOpen() {
           return this.panel?.classList.contains('open');
         }
@@ -9740,6 +10111,9 @@ export async function initializeEditor({ plugins = [] } = {}) {
           this.currentScope = scope;
           this.updateScopeButtons();
           this.updateScopeCounts();
+          if (this.container) {
+            this.container.scrollTop = 0;
+          }
           this.render();
           this.panel?.classList.add('open');
         }
@@ -9750,6 +10124,8 @@ export async function initializeEditor({ plugins = [] } = {}) {
             this.render();
           }
           this.panel?.classList.remove('open');
+          this.hideEmptyState();
+          this.teardownVirtualList();
         }
 
         notifyNotesUpdated() {
@@ -9862,7 +10238,6 @@ export async function initializeEditor({ plugins = [] } = {}) {
             this.deleteToggle.title = this.deleteEnabled ? 'Desactivar eliminación individual' : baseTitle;
           }
           const notes = this.getFilteredNotes();
-          this.container.innerHTML = '';
 
           const stats = {
             total: notesRegistry.size,
@@ -9872,31 +10247,16 @@ export async function initializeEditor({ plugins = [] } = {}) {
           this.updateStats(stats);
 
           if (notes.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'note-list-empty';
-            empty.textContent = 'No hay notas para mostrar.';
-            this.container.appendChild(empty);
+            this.teardownVirtualList();
+            this.showEmptyState();
             return;
           }
 
-          if (this.currentScope === 'all') {
-            const grouped = this.groupNotesBySection(notes);
-            grouped.forEach(group => {
-              const sectionWrapper = document.createElement('div');
-              sectionWrapper.className = 'note-section-group';
-              const title = document.createElement('h4');
-              title.className = 'notes-section-title';
-              title.innerHTML = `${group.title || 'Sin sección'} <span class="notes-count">(${group.notes.length})</span>`;
-              sectionWrapper.appendChild(title);
-              group.notes.forEach(note => {
-                sectionWrapper.appendChild(this.createNoteItem(note));
-              });
-              this.container.appendChild(sectionWrapper);
-            });
-          } else {
-            notes.forEach(note => {
-              this.container.appendChild(this.createNoteItem(note));
-            });
+          this.hideEmptyState();
+          const items = this.buildVirtualItems(notes);
+          const list = this.ensureVirtualList();
+          if (list) {
+            list.setItems(items);
           }
         }
 
@@ -9911,7 +10271,11 @@ export async function initializeEditor({ plugins = [] } = {}) {
           notes.forEach(note => {
             const key = note.sectionId || 'sin-seccion';
             if (!map.has(key)) {
-              map.set(key, { title: this.getSectionTitle(note.sectionId), notes: [] });
+              map.set(key, {
+                sectionId: note.sectionId || '',
+                title: this.getSectionTitle(note.sectionId),
+                notes: []
+              });
             }
             map.get(key).notes.push(note);
           });
@@ -12058,6 +12422,18 @@ export async function initializeEditor({ plugins = [] } = {}) {
         setFloatingNotesEditable(isEditMode);
         buildSectionsPanel();
         setActivePage(null);
+        if (typeof window !== 'undefined' && window.localStorage) {
+          try {
+            window.localStorage.removeItem(CACHE_STORAGE_KEY);
+          } catch (error) {
+            console.warn('No se pudo limpiar la caché local:', error);
+          }
+        }
+        usingExtendedCache = false;
+        void clearExtendedCacheValue();
+        if (isCacheStorageAvailable()) {
+          void clearCacheSnapshot();
+        }
         syncBodyTheme(DEFAULT_THEME);
         updateSectionIndicator(null);
       }
@@ -12460,6 +12836,17 @@ export async function initializeEditor({ plugins = [] } = {}) {
       themeSelect?.addEventListener('change', () => {
         const targetSection = currentSectionId || (getCurrentPage()?.dataset.sectionId) || 'seccion-default';
         setSectionTheme(targetSection, themeSelect.value);
+      });
+
+      [
+        customThemePrimaryInput,
+        customThemeBackgroundInput,
+        customThemeSurfaceInput,
+        customThemeTextInput
+      ].forEach((input) => {
+        input?.addEventListener('input', () => {
+          handleCustomThemeInputChange();
+        });
       });
 
       /* === EDICIÓN === */
@@ -13839,6 +14226,17 @@ ${inlineStyles}
 
     const snapshotJson = JSON.stringify(snapshot);
 
+    const cacheWritePromise = isCacheStorageAvailable()
+      ? writeCacheSnapshot(snapshotJson).then(() => true).catch((cacheError) => {
+          console.warn('No se pudo guardar la instantánea en Cache API:', cacheError);
+          return false;
+        })
+      : Promise.resolve(false);
+
+    let storageResult = 'none';
+    let storageError = null;
+    let extendedOverflow = false;
+
     try {
       if (!window.localStorage) {
         throw new Error('Almacenamiento local no disponible');
@@ -13856,44 +14254,76 @@ ${inlineStyles}
         await clearExtendedCacheValue();
       }
       usingExtendedCache = false;
-
-      if (showFeedback) {
-        if (cacheSaveBtn) {
-          showCacheButtonFeedback('✅', 'Guardado');
-        } else {
-          console.info('Cambios guardados en caché.');
-        }
-      }
-
-      return true;
+      storageResult = 'local';
     } catch (error) {
       if (isQuotaExceededError(error) && ('indexedDB' in window)) {
         try {
           await writeExtendedCacheValue(snapshotJson);
           usingExtendedCache = true;
-          if (showFeedback) {
-            if (cacheSaveBtn) {
-              showCacheButtonFeedback('📦', 'Guardado extendido');
-            } else {
-              alert('El contenido se guardó en almacenamiento extendido.');
-            }
-          }
-          return true;
+          storageResult = 'extended';
         } catch (extendedError) {
           console.error('Error al usar almacenamiento extendido:', extendedError);
-          if (showFeedback) {
-            alert('El documento es demasiado grande para guardarse automáticamente. Exporta una copia para no perder información.');
+          storageError = extendedError;
+          if (isQuotaExceededError(extendedError)) {
+            extendedOverflow = true;
           }
-          return false;
         }
+      } else {
+        storageError = error;
       }
 
-      console.error('Error al guardar en caché:', error);
+      if (storageResult === 'none' && storageError && !isQuotaExceededError(storageError)) {
+        console.error('Error al guardar en caché:', storageError);
+      }
+    }
+
+    const cacheSaved = await cacheWritePromise;
+    if (cacheSaved && storageResult === 'none') {
+      storageResult = 'cache';
+      usingExtendedCache = false;
+      if (storageError) {
+        console.warn('Se usará la caché offline debido a un error en el almacenamiento principal:', storageError);
+      }
+    }
+
+    const success = storageResult !== 'none';
+
+    if (!success) {
+      const message = storageError && storageError.message ? storageError.message : storageError;
       if (showFeedback) {
-        alert('No se pudo guardar en caché: ' + (error && error.message ? error.message : error));
+        if (extendedOverflow) {
+          alert('El documento es demasiado grande para guardarse automáticamente. Exporta una copia para no perder información.');
+        } else {
+          alert('No se pudo guardar en caché: ' + (message || 'Error desconocido'));
+        }
       }
       return false;
     }
+
+    if (showFeedback) {
+      if (cacheSaveBtn) {
+        switch (storageResult) {
+          case 'extended':
+            showCacheButtonFeedback('📦', 'Guardado extendido');
+            break;
+          case 'cache':
+            showCacheButtonFeedback('💾', 'Caché offline');
+            break;
+          case 'local':
+          default:
+            showCacheButtonFeedback('✅', 'Guardado');
+            break;
+        }
+      } else if (storageResult === 'extended') {
+        alert('El contenido se guardó en almacenamiento extendido.');
+      } else if (storageResult === 'cache') {
+        console.info('Instantánea disponible para uso offline.');
+      } else {
+        console.info('Cambios guardados en caché.');
+      }
+    }
+
+    return true;
   }
 
   async function restoreFromLocalCache() {
@@ -13918,6 +14348,18 @@ ${inlineStyles}
         }
       } catch (error) {
         console.error('No se pudo leer la caché extendida:', error);
+      }
+    }
+
+    if (!raw && isCacheStorageAvailable()) {
+      try {
+        raw = await readCacheSnapshot();
+        if (raw) {
+          source = 'cache';
+          usingExtendedCache = false;
+        }
+      } catch (error) {
+        console.error('No se pudo leer la instantánea offline:', error);
       }
     }
 
@@ -14051,6 +14493,7 @@ ${inlineStyles}
         });
       } else if (typeof data.magicContainerHtml === 'string') {
         magicContainer.innerHTML = data.magicContainerHtml;
+        enableLazyLoadingForImages(magicContainer);
         magicContainer.querySelectorAll('.magic-topic').forEach(topic => {
           afterContentSanitize(topic);
           if (topic.id) {

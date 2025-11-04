@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cora Notes</title>
+  <link rel="stylesheet" href="styles/main.css" />
+
+</head>
+<body>
+  <!-- build:topics {"especialidad":"Endocrinología","secciones":[]} -->
+  
+  <div class="topbar topbar-color-default" data-topbar>
+    <div class="topbar-left">
+      <button class="topbar-btn topbar-plus" type="button" title="Abrir panel de navegación"><span>☰</span> <span class="topbar-btn-label">Menú</span></button>
+    </div>
+    <div class="topbar-center">
+      <span id="specialtyTitle" class="topbar-topic" title="Sección actual" data-document-title="Endocrinología"></span>
+      <div class="topbar-actions">
+        <div class="zoom-controls">
+          <button class="topbar-btn" type="button" id="zoomOutBtn" title="Reducir zoom">-</button>
+          <span class="zoom-value" id="zoomValue">100%</span>
+          <button class="topbar-btn" type="button" id="zoomInBtn" title="Aumentar zoom">+</button>
+        </div>
+        <div class="document-shift-controls">
+          <button class="topbar-btn" type="button" id="shiftLeftBtn" title="Mover contenido hacia la izquierda">⬅️</button>
+          <button class="topbar-btn" type="button" id="shiftRightBtn" title="Mover contenido hacia la derecha">➡️</button>
+        </div>
+        <button class="topbar-btn" type="button" id="readingModeBtn" title="Modo lectura"><span>📖</span> <span class="topbar-btn-label">Lectura</span></button>
+        <button class="topbar-btn" type="button" id="notesViewBtn" title="Vista de notas"><span>📝</span> <span class="topbar-btn-label">Notas</span></button>
+        <button class="topbar-btn" type="button" id="imageViewerBtn" title="Visor de imágenes"><span>🖼️</span> <span class="topbar-btn-label">Imágenes</span></button>
+        <button class="topbar-btn" type="button" id="loadHtmlBtn" title="Cargar archivo HTML"><span>📂</span> <span class="topbar-btn-label">Abrir</span></button>
+        <button class="topbar-btn" type="button" id="editBtn" title="Modo edición"><span>✏️</span> <span class="topbar-btn-label">Editar</span></button>
+        <button class="topbar-btn" type="button" id="printCurrentBtn" title="Imprimir documento"><span>🖨️</span> <span class="topbar-btn-label">Imprimir</span></button>
+        <div class="topbar-group topbar-tools-group">
+          <button class="topbar-btn topbar-toggle" type="button" id="topbarToolsToggle" aria-haspopup="true" aria-expanded="false" title="Herramientas adicionales"><span>⚙️</span> <span class="topbar-btn-label">Herramientas</span></button>
+          <div class="topbar-dropdown" id="topbarToolsDropdown" role="menu">
+            <button type="button" class="topbar-dropdown-btn" id="exportDataBtn" title="Exportar secciones y temas" aria-label="Exportar secciones y temas"><span>📤</span> Exportar JSON</button>
+            <button type="button" class="topbar-dropdown-btn" id="importDataBtn" title="Importar secciones y temas" aria-label="Importar secciones y temas"><span>📥</span> Importar JSON</button>
+            <button type="button" class="topbar-dropdown-btn" id="statsBtn" title="Estadísticas"><span>📊</span> Estadísticas</button>
+            <button type="button" class="topbar-dropdown-btn" id="exportMarkdownBtn" title="Exportar a Markdown"><span>⬇️</span> Exportar MD</button>
+            <button type="button" class="topbar-dropdown-btn" id="copyHtmlBtn" title="Copiar HTML completo"><span>📋</span> Copiar HTML</button>
+            <button type="button" class="topbar-dropdown-btn" id="clearAllBtn" title="Eliminar todas las secciones y temas" aria-label="Eliminar todo"><span>🗑️</span> Limpiar todo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-group topbar-theme-group">
+        <button class="topbar-btn topbar-toggle" type="button" id="topbarThemeToggle" aria-haspopup="true" aria-expanded="false" title="Cambiar estilo de la barra" aria-label="Cambiar estilo de la barra"><span aria-hidden="true">🎨</span></button>
+        <div class="topbar-dropdown" id="topbarThemeDropdown" role="menu">
+          <button type="button" class="topbar-dropdown-btn" data-theme="topbar-color-default">Clásico</button>
+          <button type="button" class="topbar-dropdown-btn" data-theme="topbar-color-slate">Gris</button>
+          <button type="button" class="topbar-dropdown-btn" data-theme="topbar-color-night">Negro</button>
+          <button type="button" class="topbar-dropdown-btn" data-theme="topbar-color-navy">Azul intenso</button>
+          <button type="button" class="topbar-dropdown-btn" data-theme="topbar-color-sky">Azul claro</button>
+          <button type="button" class="topbar-dropdown-btn" data-theme="topbar-color-emerald">Verde</button>
+        </div>
+      </div>
+      <button class="topbar-btn" type="button" id="cacheSaveBtn" title="Guardar en caché"><span>💾</span> <span class="topbar-btn-label">Guardar</span></button>
+    </div>
+  </div>
+
+  <button class="magic-back-floating" id="magicBackFloating" type="button" aria-hidden="true" aria-label="Volver al tema principal"><span aria-hidden="true">↩️</span></button>
+
+  <button class="reading-mode-exit" id="readingModeExit" title="Salir del modo lectura">✕</button>
+
+  <input type="file" id="loadHtmlInput" accept=".html" multiple />
+  <input type="file" id="importDataInput" accept="application/json" />
+  <input type="file" id="imageViewerUploadInput" accept="image/*" multiple />
+
+  <!-- Barra de herramientas -->
+  <div class="edit-toolbar" id="editToolbar">
+    <div class="toolbar-content">
+      <div class="toolbar-group">
+        <button id="undoBtn" title="Deshacer (Ctrl+Z)">↶</button>
+        <button id="redoBtn" title="Rehacer (Ctrl+Y)">↷</button>
+      </div>
+
+      <div class="toolbar-separator"></div>
+
+      <div class="toolbar-group">
+        <select id="fontSizeSelect" title="Tamaño">
+          <option value="">Tamaño</option>
+          <option value="1">Muy pequeño</option>
+          <option value="2">Pequeño</option>
+          <option value="3">Normal</option>
+          <option value="4">Mediano</option>
+          <option value="5">Grande</option>
+          <option value="6">Muy grande</option>
+          <option value="7">Enorme</option>
+        </select>
+        <button id="fontSizeDecreaseBtn" title="Reducir tamaño proporcional">−</button>
+        <button id="fontSizeIncreaseBtn" title="Aumentar tamaño proporcional">+</button>
+        <button id="boldBtn" title="Negrita (Ctrl+B)"><strong>B</strong></button>
+        <button id="italicBtn" title="Cursiva (Ctrl+I)"><em>I</em></button>
+        <button id="underlineBtn" title="Subrayado (Ctrl+U)"><u>U</u></button>
+      </div>
+
+      <div class="toolbar-separator"></div>
+
+      <div class="toolbar-group">
+        <button id="indentBtn" title="Aumentar">→</button>
+        <button id="outdentBtn" title="Disminuir">←</button>
+      </div>
+
+      <div class="toolbar-separator"></div>
+
+      <div class="toolbar-group">
+        <button id="highlightBtn" title="Destacar">🖍️</button>
+      </div>
+
+      <div class="toolbar-group">
+        <button id="textColorBtn" title="Color">A</button>
+      </div>
+
+      <div class="toolbar-group">
+        <span class="toolbar-label">FORMATO</span>
+        <button id="copyFormatBtn" title="Copiar formato (Ctrl+Shift+C)">🎨📋</button>
+        <button id="pasteFormatBtn" title="Pegar formato (Ctrl+Shift+V)">🎨📄</button>
+      </div>
+
+      <div class="toolbar-separator"></div>
+
+      <div class="toolbar-group">
+        <button id="insertTableBtn" title="Tabla">📊</button>
+        <button id="insertUlBtn" title="Lista">•</button>
+        <button id="insertOlBtn" title="Numerada">1.</button>
+        <button id="insertHtmlBtn" title="HTML personalizado">&lt;/&gt;</button>
+        <button id="symbolPickerBtn" title="Insertar símbolos">🔹</button>
+        <button id="insertTemplateBtn" title="Plantillas">📝</button>
+        <button id="insertCollapseCardBtn" title="Tarjeta colapsable">📘</button>
+      </div>
+
+      <div class="toolbar-separator"></div>
+
+      <div class="toolbar-group">
+        <button id="copyHtmlSelectionBtn" title="Copiar HTML">&lt;&gt;</button>
+        <button id="findReplaceBtn" title="Buscar">🔍</button>
+        <button id="removeFormatBtn" title="Limpiar">🧹</button>
+      </div>
+
+      <div class="toolbar-separator"></div>
+
+      <div class="toolbar-group">
+        <span class="toolbar-label">ESPACIADO</span>
+        <button id="spacingToolBtn" title="Ajustar espaciado">↕️</button>
+      </div>
+
+      <div class="toolbar-separator"></div>
+
+      <div class="toolbar-group">
+        <span class="toolbar-label">NOTAS</span>
+        <button id="addFloatingNoteBtn" title="Nota flotante">🗒️</button>
+        <button id="toggleNotesBtn" title="Mostrar/Ocultar notas">👁️</button>
+        <button id="toggleMainContentBtn" title="Ocultar contenido principal">🗂️</button>
+        <button id="printFloatingNotesViewBtn" title="Imprimir notas visibles">🖨️</button>
+      </div>
+
+      <div class="toolbar-separator"></div>
+
+      <div class="toolbar-group">
+        <select id="themeSelect" title="Esquema">
+          <option value="theme-blue">Azul</option>
+          <option value="theme-green">Verde</option>
+          <option value="theme-purple">Lavanda</option>
+          <option value="theme-orange">Naranja</option>
+          <option value="theme-teal">Turquesa</option>
+          <option value="theme-rose">Rosa</option>
+          <option value="theme-sand">Arena</option>
+          <option value="theme-slate">Pizarra</option>
+        </select>
+        <button id="exportTopicBtn" title="Exportar">💾</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paletas de color -->
+  <div class="color-palette" id="highlightPalette"></div>
+  <div class="color-palette" id="textColorPalette"></div>
+
+  <div class="spacing-tool" id="spacingTool" aria-hidden="true">
+    <div class="spacing-tool-header">
+      <span>Control de espaciado</span>
+      <button type="button" id="spacingToolClose" aria-label="Cerrar panel">×</button>
+    </div>
+    <div class="spacing-tool-body">
+      <div class="spacing-tool-row">
+        <label for="spacingMarginTop">Margen superior (px)</label>
+        <div class="spacing-tool-control">
+          <input type="range" id="spacingMarginTop" min="0" max="160" step="1" value="0" />
+          <span class="spacing-tool-value" id="spacingMarginTopValue">0 px</span>
+        </div>
+      </div>
+      <div class="spacing-tool-row">
+        <label for="spacingMarginBottom">Margen inferior (px)</label>
+        <div class="spacing-tool-control">
+          <input type="range" id="spacingMarginBottom" min="0" max="160" step="1" value="0" />
+          <span class="spacing-tool-value" id="spacingMarginBottomValue">0 px</span>
+        </div>
+      </div>
+      <div class="spacing-tool-row">
+        <label for="spacingBlockGap">Espacio entre bloques (px)</label>
+        <div class="spacing-tool-control">
+          <input type="range" id="spacingBlockGap" min="0" max="160" step="1" value="0" />
+          <span class="spacing-tool-value" id="spacingBlockGapValue">0 px</span>
+        </div>
+      </div>
+      <div class="spacing-tool-row">
+        <label for="spacingLineHeight">Interlineado</label>
+        <div class="spacing-tool-control">
+          <input type="range" id="spacingLineHeight" min="0.8" max="3" step="0.05" value="1.4" />
+          <span class="spacing-tool-value" id="spacingLineHeightValue">1.40</span>
+        </div>
+      </div>
+    </div>
+    <div class="spacing-tool-footer">
+      <button type="button" id="spacingToolReset">Restablecer</button>
+      <button type="button" id="spacingToolDone">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Panel de herramientas de imagen -->
+  <div class="image-toolbar" id="imageToolbar">
+    <div class="image-toolbar-row">
+      <button id="alignLeftBtn" title="Izquierda">⬅️</button>
+      <button id="alignCenterBtn" title="Centro">⬌</button>
+      <button id="alignRightBtn" title="Derecha">➡️</button>
+      <button id="inlineBtn" title="En línea">↔️</button>
+    </div>
+    <div class="image-toolbar-row">
+      <label for="imageAltInput">Alt:</label>
+      <input type="text" id="imageAltInput" placeholder="Texto alternativo" style="flex:1; font-size: 1.048rem; padding: 0.38rem;">
+      <button id="applyAltBtn" title="Aplicar texto alternativo">Aplicar</button>
+    </div>
+    <div class="image-toolbar-row">
+      <label for="imageFrameToggle">Marco:</label>
+      <input type="checkbox" id="imageFrameToggle" style="margin-right: 6px;">
+      <span style="font-size: 0.952rem; color: #495057;">Agregar marco</span>
+    </div>
+    <div class="image-toolbar-row">
+      <button id="wrapFigureBtn" title="Agregar figura" style="flex:1;">➕ Cuadro</button>
+      <button id="unwrapFigureBtn" title="Quitar figura" style="flex:1;">➖ Quitar</button>
+    </div>
+    <div class="image-toolbar-row">
+      <label>Ancho:</label>
+      <div class="image-size-controls">
+        <button type="button" class="image-size-btn" id="imageWidthDecrease" title="Reducir tamaño">−</button>
+        <span class="size-display" id="widthDisplay">100% (200px)</span>
+        <button type="button" class="image-size-btn" id="imageWidthIncrease" title="Aumentar tamaño">+</button>
+      </div>
+    </div>
+    <div class="image-toolbar-row">
+      <button id="cropImageBtn" title="Recortar imagen" style="flex: 1;">✂️ Recortar</button>
+    </div>
+    <div class="image-toolbar-row">
+      <button id="deleteImageBtn" title="Eliminar" style="color: #dc3545; flex: 1;">🗑️ Eliminar</button>
+    </div>
+  </div>
+
+  <div class="table-menu" id="tableMenu" aria-hidden="true">
+    <div class="table-menu-header">
+      <div class="table-menu-header-info">
+        <span class="table-menu-title">Tabla seleccionada</span>
+        <span class="table-menu-size" id="tableMenuSize">0 × 0</span>
+      </div>
+      <div class="table-menu-actions">
+        <button type="button" class="table-menu-resize" id="tableResizeBtn">Tamaño</button>
+        <button type="button" class="table-menu-close" id="tableMenuClose" title="Cerrar panel">×</button>
+      </div>
+    </div>
+    <div class="table-menu-tabs" role="tablist">
+      <button type="button" class="table-menu-tab active" data-tab="structure" role="tab" aria-selected="true">✏️</button>
+      <button type="button" class="table-menu-tab" data-tab="style" role="tab" aria-selected="false">🎨</button>
+    </div>
+    <div class="table-menu-body">
+      <div class="table-menu-panel active" data-panel="structure" role="tabpanel">
+        <div class="table-menu-section">
+          <h4>Acciones rápidas</h4>
+          <div class="table-menu-grid two-columns">
+            <button type="button" data-action="insert-row-above">Fila ↑</button>
+            <button type="button" data-action="insert-row-below">Fila ↓</button>
+            <button type="button" data-action="insert-column-left">Columna ←</button>
+            <button type="button" data-action="insert-column-right">Columna →</button>
+            <button type="button" data-action="delete-row">Eliminar fila</button>
+            <button type="button" data-action="delete-column">Eliminar columna</button>
+            <button type="button" data-action="clear-column">Limpiar columna</button>
+            <button type="button" data-action="select-column">Seleccionar columna</button>
+            <button type="button" data-action="move-left">Tabla ←</button>
+            <button type="button" data-action="move-right">Tabla →</button>
+            <button type="button" data-action="toggle-header" data-stateful="true">Fila encabezado</button>
+            <button type="button" data-action="toggle-zebra" data-stateful="true">Patrón cebra</button>
+            <button type="button" data-action="open-tools">Más herramientas</button>
+          </div>
+        </div>
+      </div>
+      <div class="table-menu-panel" data-panel="style" role="tabpanel">
+        <div class="table-menu-section">
+          <h4>Temas</h4>
+          <div class="table-theme-gallery">
+            <button type="button" class="table-theme-option active" data-table-theme="">
+              <span class="table-theme-sample table-theme-default">Base</span>
+            </button>
+            <button type="button" class="table-theme-option" data-table-theme="table-theme-ocean">
+              <span class="table-theme-sample table-theme-ocean">Azul</span>
+            </button>
+            <button type="button" class="table-theme-option" data-table-theme="table-theme-forest">
+              <span class="table-theme-sample table-theme-forest">Verde</span>
+            </button>
+            <button type="button" class="table-theme-option" data-table-theme="table-theme-sunset">
+              <span class="table-theme-sample table-theme-sunset">Amanecer</span>
+            </button>
+            <button type="button" class="table-theme-option" data-table-theme="table-theme-violet">
+              <span class="table-theme-sample table-theme-violet">Lavanda</span>
+            </button>
+            <button type="button" class="table-theme-option" data-table-theme="table-theme-rose">
+              <span class="table-theme-sample table-theme-rose">Rosa</span>
+            </button>
+            <button type="button" class="table-theme-option" data-table-theme="table-theme-teal">
+              <span class="table-theme-sample table-theme-teal">Turquesa</span>
+            </button>
+            <button type="button" class="table-theme-option" data-table-theme="table-theme-sand">
+              <span class="table-theme-sample table-theme-sand">Arena</span>
+            </button>
+            <button type="button" class="table-theme-option" data-table-theme="table-theme-slate">
+              <span class="table-theme-sample table-theme-slate">Gris</span>
+            </button>
+          </div>
+        </div>
+        <div class="table-menu-section">
+          <h4>Espaciado</h4>
+          <div class="table-slider-row">
+            <label for="tableLineHeight">Interlineado</label>
+            <input type="range" id="tableLineHeight" min="1" max="2" step="0.05">
+            <span class="table-slider-value" id="tableLineHeightValue">1.25</span>
+          </div>
+          <div class="table-slider-row">
+            <label for="tablePaddingY">Padding vertical</label>
+            <input type="range" id="tablePaddingY" min="2" max="32" step="1">
+            <span class="table-slider-value" id="tablePaddingYValue">6px</span>
+          </div>
+          <div class="table-slider-row">
+            <label for="tableMargin">Margen exterior</label>
+            <input type="range" id="tableMargin" min="0" max="48" step="1">
+            <span class="table-slider-value" id="tableMarginValue">6px</span>
+          </div>
+          <div class="table-preset-buttons">
+            <button type="button" data-table-preset="compacta">Compacta</button>
+            <button type="button" data-table-preset="equilibrada">Equilibrada</button>
+            <button type="button" data-table-preset="amplia">Amplia</button>
+          </div>
+        </div>
+        <div class="table-menu-section">
+          <h4>Líneas divisorias</h4>
+          <div class="table-border-colors">
+            <button type="button" class="table-border-color-btn" style="background:#dee2e6;" data-border-color="#dee2e6"></button>
+            <button type="button" class="table-border-color-btn" style="background:#adb5bd;" data-border-color="#adb5bd"></button>
+            <button type="button" class="table-border-color-btn" style="background:#0d6efd;" data-border-color="#0d6efd"></button>
+            <button type="button" class="table-border-color-btn" style="background:#198754;" data-border-color="#198754"></button>
+            <button type="button" class="table-border-color-btn" style="background:#fd7e14;" data-border-color="#fd7e14"></button>
+            <button type="button" class="table-border-color-btn" style="background:#6f42c1;" data-border-color="#6f42c1"></button>
+            <input type="color" id="tableBorderColorCustom" value="#dee2e6" title="Color personalizado">
+          </div>
+          <div class="table-slider-row">
+            <label for="tableBorderWidth">Grosor</label>
+            <input type="range" id="tableBorderWidth" min="0" max="8" step="0.5">
+            <span class="table-slider-value" id="tableBorderWidthValue">1px</span>
+          </div>
+          <div class="table-border-toggle">
+            <label><input type="checkbox" id="toggleVerticalBorders"> Ocultar verticales</label>
+            <label><input type="checkbox" id="toggleHorizontalBorders"> Ocultar horizontales</label>
+          </div>
+          <div class="table-preset-buttons">
+            <button type="button" data-border-reset="true">Restablecer</button>
+          </div>
+        </div>
+        <div class="table-menu-section table-outer-border">
+          <h4>Borde exterior</h4>
+          <label class="table-outer-border-toggle"><input type="checkbox" id="toggleOuterBorder" checked> Mostrar borde exterior</label>
+          <div class="table-border-colors table-outer-border-colors">
+            <button type="button" class="table-border-color-btn table-outer-border-color-btn" style="background:#000000;" data-border-color="#000000"></button>
+            <button type="button" class="table-border-color-btn table-outer-border-color-btn" style="background:#475569;" data-border-color="#475569"></button>
+            <button type="button" class="table-border-color-btn table-outer-border-color-btn" style="background:#9ca3af;" data-border-color="#9ca3af"></button>
+            <button type="button" class="table-border-color-btn table-outer-border-color-btn" style="background:#fecaca;" data-border-color="#fecaca"></button>
+            <button type="button" class="table-border-color-btn table-outer-border-color-btn" style="background:#fef08a;" data-border-color="#fef08a"></button>
+            <button type="button" class="table-border-color-btn table-outer-border-color-btn" style="background:#bbf7d0;" data-border-color="#bbf7d0"></button>
+            <button type="button" class="table-border-color-btn table-outer-border-color-btn" style="background:#bfdbfe;" data-border-color="#bfdbfe"></button>
+            <button type="button" class="table-border-color-btn table-outer-border-color-btn" style="background:#ddd6fe;" data-border-color="#ddd6fe"></button>
+            <button type="button" class="table-border-color-btn table-outer-border-color-btn" style="background:#fbcfe8;" data-border-color="#fbcfe8"></button>
+            <input type="color" id="tableOuterBorderColorCustom" value="#94a3b8" title="Color personalizado borde exterior">
+          </div>
+          <div class="table-slider-row">
+            <label for="tableOuterBorderWidth">Grosor</label>
+            <input type="range" id="tableOuterBorderWidth" min="0" max="12" step="0.5" value="1">
+            <span class="table-slider-value" id="tableOuterBorderWidthValue">1px</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-resize-overlay" id="tableResizeOverlay" aria-hidden="true"></div>
+
+  <div class="image-crop-modal" id="imageCropModal" aria-hidden="true">
+    <div class="image-crop-dialog">
+      <div class="image-crop-header">
+        <strong>Recortar imagen</strong>
+        <button type="button" id="imageCropCloseBtn" class="image-crop-close" title="Cerrar">&times;</button>
+      </div>
+      <div class="image-crop-stage" id="imageCropStage">
+        <img id="imageCropPreview" alt="Vista previa de la imagen a recortar" />
+        <div class="image-crop-selection" id="imageCropSelection"></div>
+        <p class="image-crop-instructions">Haz clic y arrastra sobre la imagen para elegir el área a conservar.</p>
+      </div>
+      <div class="image-crop-footer">
+        <span class="image-crop-size" id="imageCropSizeLabel">0 × 0 px</span>
+        <div class="image-crop-actions">
+          <button type="button" id="imageCropCancelBtn">Cancelar</button>
+          <button type="button" id="imageCropApplyBtn" disabled>Aplicar recorte</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="template-toolbar" id="templateToolbar">
+    <div class="template-toolbar-row compact">
+      <label for="templateBgColor">Fondo:</label>
+      <div class="template-color-palette" id="templateBgPalette"></div>
+      <input type="color" id="templateBgColor" value="#ffffff">
+      <button id="templateClearBgBtn" title="Quitar fondo">Sin fondo</button>
+    </div>
+    <div class="template-toolbar-row compact">
+      <label for="templateTextColor">Texto:</label>
+      <div class="template-color-palette" id="templateTextPalette"></div>
+      <input type="color" id="templateTextColor" value="#212529">
+      <button id="templateResetTextColorBtn" title="Restablecer color">Restablecer</button>
+    </div>
+    <div class="template-toolbar-row">
+      <label for="templateBorderWidth">Borde:</label>
+      <input type="range" id="templateBorderWidth" min="0" max="12" step="1">
+      <span class="size-display" id="templateBorderWidthDisplay">1px</span>
+    </div>
+    <div class="template-toolbar-row compact" id="templateBorderColorRow">
+      <label for="templateBorderColor">Color borde:</label>
+      <div class="template-color-palette" id="templateBorderPalette"></div>
+      <input type="color" id="templateBorderColor" value="#ced4da">
+    </div>
+    <div class="template-toolbar-row compact" id="templateAccentColorRow" style="display:none;">
+      <label for="templateAccentColor">Borde izq.:</label>
+      <div class="template-color-palette" id="templateAccentPalette"></div>
+      <input type="color" id="templateAccentColor" value="#0d6efd">
+    </div>
+    <div class="template-toolbar-row" id="templateNoteStyleRow" style="display:none;">
+      <label for="templateNoteStyle">Estilo:</label>
+      <select id="templateNoteStyle">
+        <option value="classic">Clásica</option>
+        <option value="sky">Cielo suave</option>
+        <option value="forest">Bosque</option>
+        <option value="sunrise">Amanecer</option>
+        <option value="rose">Rosada</option>
+        <option value="lilac">Lavanda</option>
+        <option value="slate">Gris suave</option>
+        <option value="pearl">Perla</option>
+        <option value="custom">Personalizado</option>
+      </select>
+    </div>
+    <div class="template-toolbar-row" id="templateSpacingRow" style="display:none;">
+      <span class="template-toolbar-static-label">Espacios:</span>
+      <div class="template-spacing-buttons">
+        <button type="button" id="templateAddSpaceTopBtn" title="Agregar espacio arriba">↑ +</button>
+        <button type="button" id="templateAddSpaceBottomBtn" title="Agregar espacio abajo">↓ +</button>
+      </div>
+    </div>
+    <div class="template-toolbar-row">
+      <label for="templateFontSize">Tamaño:</label>
+      <input type="range" id="templateFontSize" min="80" max="180" step="5">
+      <span class="size-display" id="templateFontSizeDisplay">100%</span>
+    </div>
+    <div class="template-toolbar-row">
+      <label for="templateMarginTop">Arriba:</label>
+      <input type="range" id="templateMarginTop" min="0" max="120" step="1">
+      <span class="size-display" id="templateMarginTopDisplay">0px</span>
+    </div>
+    <div class="template-toolbar-row">
+      <label for="templateMarginBottom">Abajo:</label>
+      <input type="range" id="templateMarginBottom" min="0" max="120" step="1">
+      <span class="size-display" id="templateMarginBottomDisplay">0px</span>
+    </div>
+    <div class="template-toolbar-row">
+      <button id="templateDeleteBtn" title="Eliminar plantilla" style="color:#dc3545; flex:1;">🗑️ Eliminar</button>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content" id="modalContent"></div>
+  </div>
+
+  <!-- Panel de navegación -->
+  <aside id="topic-panel" class="topic-panel">
+    <div class="panel-header">
+      <div class="panel-header-info">
+        <strong>Navegación</strong>
+        <span class="panel-topic-count" id="panelTopicCount" aria-live="polite">0 temas</span>
+      </div>
+      <div class="panel-header-actions">
+        <button class="panel-header-btn" id="editPanelBtn" title="Editar secciones">✏️</button>
+        <button class="panel-header-btn" id="addSectionBtn" title="Nueva sección">➕</button>
+        <button class="panel-close">&times;</button>
+      </div>
+    </div>
+    <div class="panel-actions">
+      <button class="panel-action-btn" id="toggleAllBtn" title="Expandir/Colapsar todo">⊞</button>
+      <button class="panel-action-btn" id="sortAlphaBtn">🔤</button>
+      <button class="panel-action-btn" id="sortNumBtn">🔢</button>
+    </div>
+    <div class="panel-search" role="search">
+      <span class="panel-search-icon" aria-hidden="true">🔍</span>
+      <input
+        type="search"
+        id="panelSearchInput"
+        class="panel-search-input"
+        placeholder="Buscar secciones o temas"
+        aria-label="Buscar secciones o temas"
+        autocomplete="off"
+      />
+      <button type="button" class="panel-search-clear" id="panelSearchClear" aria-label="Limpiar búsqueda">×</button>
+    </div>
+    <div class="sections-container" id="sectionsContainer"></div>
+  </aside>
+
+  <aside id="notesViewPanel" class="notes-view-panel">
+    <div class="notes-view-header">
+      <h3>📝 Mis Notas</h3>
+      <button class="panel-close" data-action="close-notes">×</button>
+    </div>
+
+    <div class="notes-view-controls">
+      <div class="notes-scope-selector">
+        <button class="scope-btn active" data-scope="all">Todas (0)</button>
+        <button class="scope-btn" data-scope="section">Sección actual (0)</button>
+        <button class="scope-btn" data-scope="topic">Tema actual (0)</button>
+      </div>
+
+      <div class="notes-filters">
+        <select id="noteCategoryFilter">
+          <option value="">Todas las categorías</option>
+          <option value="IMPORTANT">⚠️ Importante</option>
+          <option value="PEARL">💎 Perlas</option>
+          <option value="REMEMBER">🔔 Recordar</option>
+          <option value="QUESTION">❓ Dudas</option>
+          <option value="REFERENCE">📚 Referencias</option>
+          <option value="TODO">☑️ Por hacer</option>
+          <option value="PERSONAL">✍️ Personal</option>
+        </select>
+
+        <select id="notePriorityFilter">
+          <option value="">Todas las prioridades</option>
+          <option value="high">Alta</option>
+          <option value="normal">Normal</option>
+          <option value="low">Baja</option>
+        </select>
+
+        <select id="notesSortBy">
+          <option value="recent">Más recientes</option>
+          <option value="oldest">Más antiguas</option>
+          <option value="priority">Por prioridad</option>
+          <option value="category">Por categoría</option>
+          <option value="topic">Por tema</option>
+          <option value="unreviewed">Sin revisar</option>
+        </select>
+      </div>
+
+      <div class="notes-search">
+        <input type="search" placeholder="Buscar en notas..." id="notesSearchInput" />
+      </div>
+
+      <div class="notes-view-modes">
+        <button class="view-mode-btn active" data-mode="list" title="Lista">≡</button>
+        <button class="view-mode-btn" data-mode="grid" title="Cuadrícula">▦</button>
+        <button class="view-mode-btn" data-mode="timeline" title="Línea temporal">─</button>
+      </div>
+
+      <div class="notes-view-actions">
+        <button class="notes-action-btn" id="notesDeleteToggle" title="Eliminar notas individualmente" aria-pressed="false">🗑️</button>
+      </div>
+    </div>
+
+    <div class="notes-stats">
+      <div class="stat-item">
+        <span class="stat-value" data-stat="total">0</span>
+        <span class="stat-label">Total</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value" data-stat="unreviewed">0</span>
+        <span class="stat-label">Sin revisar</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value" data-stat="high-priority">0</span>
+        <span class="stat-label">Prioritarias</span>
+      </div>
+    </div>
+
+    <div class="notes-list" id="notesListContainer"></div>
+
+    <div class="notes-bulk-actions">
+      <button id="exportNotesBtn">📤 Exportar</button>
+      <button id="printNotesBtn">🖨️ Imprimir</button>
+      <button id="clearReviewedBtn">✓ Limpiar revisadas</button>
+    </div>
+  </aside>
+
+  <div id="imageViewerPanel" class="image-viewer-panel" aria-hidden="true">
+    <div class="image-viewer-header">
+      <div class="image-viewer-header-info">
+        <h3>🖼️ Visor de imágenes</h3>
+      </div>
+      <div class="image-viewer-header-actions">
+        <button type="button" class="image-viewer-action" id="imageViewerAddImageBtn" title="Agregar imágenes">➕ Añadir</button>
+        <button type="button" class="image-viewer-action" id="imageViewerDownloadBtn" title="Descargar imagen" disabled>⬇️ Guardar</button>
+        <button type="button" class="image-viewer-close" id="imageViewerCloseBtn" title="Cerrar visor">×</button>
+      </div>
+    </div>
+    <div class="image-viewer-content">
+      <div class="image-viewer-stage">
+        <div class="image-viewer-stage-surface" id="imageViewerStageSurface">
+          <button type="button" class="image-viewer-nav image-viewer-nav-prev" id="imageViewerPrevBtn" aria-label="Ver imagen anterior">‹</button>
+          <div class="image-viewer-zoom-controls">
+            <button type="button" class="image-viewer-zoom-btn" id="imageViewerZoomOutBtn" title="Reducir" aria-label="Reducir zoom">−</button>
+            <span class="image-viewer-zoom-value" id="imageViewerZoomValue">100%</span>
+            <button type="button" class="image-viewer-zoom-btn" id="imageViewerZoomInBtn" title="Ampliar" aria-label="Ampliar zoom">+</button>
+            <button type="button" class="image-viewer-zoom-btn" id="imageViewerZoomResetBtn" title="Restablecer zoom" aria-label="Restablecer zoom">⤢</button>
+          </div>
+          <img id="imageViewerActiveImage" alt="Imagen seleccionada en el visor" />
+          <button type="button" class="image-viewer-nav image-viewer-nav-next" id="imageViewerNextBtn" aria-label="Ver imagen siguiente">›</button>
+          <div class="image-viewer-empty" id="imageViewerEmptyState">
+            <strong>Sin imágenes cargadas</strong>
+            <p>Usa “Añadir” para abrir imágenes privadas visibles solo en este visor.</p>
+          </div>
+        </div>
+      </div>
+      <div class="image-viewer-footer">
+        <section class="image-viewer-notes">
+          <header class="image-viewer-section-header">
+            <h4>Notas</h4>
+          </header>
+          <textarea id="imageViewerNotes" placeholder="Escribe una nota para esta imagen…" spellcheck="false"></textarea>
+        </section>
+        <section class="image-viewer-gallery">
+          <header class="image-viewer-section-header">
+            <h4>Miniaturas</h4>
+            <button type="button" class="image-viewer-remove" id="imageViewerRemoveBtn" title="Eliminar imagen seleccionada">🗑️</button>
+          </header>
+          <div class="image-viewer-gallery-grid" id="imageViewerGallery"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-backdrop" class="panel-backdrop"></div>
+  
+  <aside id="magic-view" class="magic-view">
+  </aside>
+
+  <div id="floatingNotesLayer" class="floating-notes-layer"></div>
+
+  <!-- Contenido mágico -->
+  <div class="magic-content-container" style="display:none"></div>
+
+  <!-- Páginas -->
+
+  <script type="module" src="scripts/app.js"></script>
+</body>
+</html>
